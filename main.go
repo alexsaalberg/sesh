@@ -54,6 +54,9 @@ func (m *boxL) HandleEvent(ev tcell.Event) bool {
 			//buttons[0].Draw()
 			buttons[0].RawText = "fuck"
 			buttons[0].ReText()
+			button := buttons[0]
+			button.SetText("wtf")
+			buttons[0].Text.SetText("tet")
 			//box.Draw()
 			//seshLine.Draw()
 		}

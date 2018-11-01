@@ -9,11 +9,11 @@ import (
 )
 
 type SeshButton struct {
+	views.Text
 	Key rune
 	fileInfo os.FileInfo
 	RawText string
 	textWidth int
-	views.Text
 }
 
 func (button *SeshButton) HandleEvent(ev tcell.Event) bool {
@@ -23,7 +23,11 @@ func (button *SeshButton) HandleEvent(ev tcell.Event) bool {
 			// do callback
 			//fmt.Printf(string(button.Key)+" click!\n")
 			//fmt.Fprintln(os.Stderr, "three"+string(button.Key))
-			button.Text.SetText("CLICK") // temp
+			button.SetText("CLICK") // temp
+			button.RawText = "click"
+			button.ReText()
+			TestVar := "wtfwtf"
+			button.SetText(TestVar)
 			//button.Draw()
 			//button.Text.PostEventWidgetContent(button)
 			//return false
