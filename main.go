@@ -17,7 +17,9 @@ package main
 import (
 	"fmt"
 	"os"
+	//"time"
 	"io/ioutil"
+	//"strconv"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
@@ -46,19 +48,8 @@ func (m *boxL) HandleEvent(ev tcell.Event) bool {
 			app.Quit()
 			return true
 		case tcell.KeyRune:
-			//app.Refresh()
-			//fmt.Fprintln(os.Stderr, "one")
-			//app.Update()
-			//buttons[0].SetText(string(ev.Rune()))
-			//buttons[1].SetText("fuck")
-			//buttons[0].Draw()
-			buttons[0].RawText = "fuck"
-			buttons[0].ReText()
-			button := buttons[0]
-			button.SetText("wtf")
+			//fmt.Print("[main "+strconv.FormatInt(time.Now().UnixNano(), 10)[10:]+"]")
 			buttons[0].Text.SetText("tet")
-			//box.Draw()
-			//seshLine.Draw()
 		}
 	}
 	//fmt.Fprintln(os.Stderr, "two")
@@ -80,14 +71,13 @@ func main() {
 		buttons[i] = NewButton()
 		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]))
 		buttons[i].Key = seshKeys[i]
-		buttons[i].RawText = string(buttons[i].Key)+"wow"
 
 		if(len(files) > i) {
 			buttons[i].SetFileInfo(files[i])
 		}
 		seshLine.AddWidget(buttons[i], 0.125)
-		buttons[i].CalculateWidth()
-		buttons[i].ReText()
+		//buttons[i].CalculateWidth()
+		//buttons[i].ReText()
 	}
 
 	box.SetOrientation(views.Vertical)
