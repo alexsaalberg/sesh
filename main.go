@@ -26,8 +26,8 @@ import (
 )
 
 var seshKeys = [8]rune{'a','s','d','f','j','k','l',';'}
-//var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
-var seshColors = [8]tcell.Color{0,1,2,3,4,5,6,7}
+var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
+//var seshColors = [8]tcell.Color{0,1,2,3,4,5,6,7}
 
 type boxL struct {
 	views.BoxLayout
@@ -35,25 +35,26 @@ type boxL struct {
 
 var app = &views.Application{}
 var box = &boxL{}
-//var SeshButtons [8]*views.Text
+var seshStatus = &boxL{}
+var seshShell = &boxL{}
 var buttons [8]*SeshButton
 var seshLine = views.NewBoxLayout(views.Horizontal)
 
 func (m *boxL) HandleEvent(ev tcell.Event) bool {
+	//fmt.Fprintf(os.Stderr, "event\n")
 	switch ev := ev.(type) {
 	case *tcell.EventKey:
-		//fmt.Printf("fuck\n")
 		switch ev.Key() {
-		case tcell.KeyEscape, tcell.KeyEnter: 
+		case tcell.KeyEscape, tcell.KeyEnter:
 			app.Quit()
 			return true
-		case tcell.KeyRune:
-			//fmt.Print("[main "+strconv.FormatInt(time.Now().UnixNano(), 10)[10:]+"]")
-			buttons[0].Text.SetText("tet")
 		}
 	}
-	//fmt.Fprintln(os.Stderr, "two")
 	return m.BoxLayout.HandleEvent(ev)
+}
+
+func (m *boxL) Refresh() {
+
 }
 
 func main() {
@@ -66,22 +67,34 @@ func main() {
 		os.Exit(1)
 	}
 
+	var spacerText = views.NewText()
+	spacerText.SetText(" ")
+	seshLine.AddWidget(spacerText,0)
 	// create sesh buttons, add dirname to them
 	for i := 0; i < 8; i++ {
 		buttons[i] = NewButton()
-		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]))
+		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]).Background(tcell.ColorWhite))
+		buttons[i].SetAlignment(views.AlignMiddle)
 		buttons[i].Key = seshKeys[i]
 
 		if(len(files) > i) {
 			buttons[i].SetFileInfo(files[i])
 		}
-		seshLine.AddWidget(buttons[i], 0.125)
-		//buttons[i].CalculateWidth()
-		//buttons[i].ReText()
+		seshLine.AddWidget(buttons[i], 0.1)
+
+		spacerText = views.NewText()
+		spacerText.SetText(" ")
+		if i == 3 {
+			spacerText.SetText("  ") // bigger gap between hands
+		}
+		seshLine.AddWidget(spacerText, 0)
 	}
 
 	box.SetOrientation(views.Vertical)
-	box.AddWidget(seshLine, 0.9)
+	box.AddWidget(seshStatus, 0.5)
+	box.AddWidget(seshLine, 0)
+
+	box.AddWidget(seshShell, 0.5)
 
 	app.SetRootWidget(box)
 	if e := app.Run(); e != nil {
