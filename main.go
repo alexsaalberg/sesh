@@ -24,7 +24,8 @@ import (
 )
 
 var seshKeys = [8]rune{'a','s','d','f','j','k','l',';'}
-var seshColors = [8]tcell.Color{15,9,10,11,12,13,14,15}
+//var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
+var seshColors = [8]tcell.Color{0,1,2,3,4,5,6,7}
 
 type boxL struct {
 	views.BoxLayout
@@ -34,32 +35,35 @@ var app = &views.Application{}
 var box = &boxL{}
 //var SeshButtons [8]*views.Text
 var buttons [8]*SeshButton
-
+var seshLine = views.NewBoxLayout(views.Horizontal)
 
 func (m *boxL) HandleEvent(ev tcell.Event) bool {
 	switch ev := ev.(type) {
 	case *tcell.EventKey:
-		if ev.Key() == tcell.KeyEscape {
-			app.Quit()
-			return true
-		}
+		//fmt.Printf("fuck\n")
 		switch ev.Key() {
 		case tcell.KeyEscape, tcell.KeyEnter: 
 			app.Quit()
 			return true
 		case tcell.KeyRune:
-			switch ev.Rune() {
-			case 'a':
-			case 's':
-			case 'd':
-			}
+			//app.Refresh()
+			//fmt.Fprintln(os.Stderr, "one")
+			//app.Update()
+			//buttons[0].SetText(string(ev.Rune()))
+			//buttons[1].SetText("fuck")
+			//buttons[0].Draw()
+			buttons[0].RawText = "fuck"
+			buttons[0].ReText()
+			//box.Draw()
+			//seshLine.Draw()
 		}
 	}
+	//fmt.Fprintln(os.Stderr, "two")
 	return m.BoxLayout.HandleEvent(ev)
 }
 
 func main() {
-	seshLine := views.NewBoxLayout(views.Horizontal)
+	//seshLine = views.NewBoxLayout(views.Horizontal)
 
 	//read in current dir
 	files, err := ioutil.ReadDir(".")
@@ -73,12 +77,14 @@ func main() {
 		buttons[i] = NewButton()
 		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]))
 		buttons[i].Key = seshKeys[i]
+		buttons[i].RawText = string(buttons[i].Key)+"wow"
 
-		buttons[i].CalculateWidth()
 		if(len(files) > i) {
 			buttons[i].SetFileInfo(files[i])
 		}
 		seshLine.AddWidget(buttons[i], 0.125)
+		buttons[i].CalculateWidth()
+		buttons[i].ReText()
 	}
 
 	box.SetOrientation(views.Vertical)
