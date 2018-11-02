@@ -18,15 +18,15 @@ import (
 	"fmt"
 	"os"
 	//"time"
-	"io/ioutil"
+	//"io/ioutil"
 	//"strconv"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
 
-var seshKeys = [8]rune{'a','s','d','f','j','k','l',';'}
-var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
+//var seshKeys = [8]rune{'a','s','d','f','j','k','l',';'}
+//var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
 //var seshColors = [8]tcell.Color{0,1,2,3,4,5,6,7}
 
 type boxL struct {
@@ -35,6 +35,7 @@ type boxL struct {
 
 var app = &views.Application{}
 var box = &boxL{}
+var seshBox = NewSeshBox()
 var seshStatus = &boxL{}
 var seshShell = &boxL{}
 var buttons [8]*SeshButton
@@ -59,7 +60,7 @@ func (m *boxL) Refresh() {
 
 func main() {
 	//seshLine = views.NewBoxLayout(views.Horizontal)
-
+/*
 	//read in current dir
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
@@ -73,7 +74,7 @@ func main() {
 	// create sesh buttons, add dirname to them
 	for i := 0; i < 8; i++ {
 		buttons[i] = NewButton()
-		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]).Background(tcell.ColorWhite))
+		buttons[i].SetStyle(tcell.StyleDefault.Foreground(seshColors[i]).Background(tcell.ColorGrey))
 		buttons[i].SetAlignment(views.AlignMiddle)
 		buttons[i].Key = seshKeys[i]
 
@@ -90,13 +91,20 @@ func main() {
 		seshLine.AddWidget(spacerText, 0)
 	}
 
-	box.SetOrientation(views.Vertical)
-	box.AddWidget(seshStatus, 0.5)
-	box.AddWidget(seshLine, 0)
+	seshBox.Initialize()
 
-	box.AddWidget(seshShell, 0.5)
+	seshBox.AddWidget(seshStatus, 0.5)
+	seshBox.AddWidget(seshLine, 0)
 
-	app.SetRootWidget(box)
+	seshBox.AddWidget(seshShell, 0.5)
+*/
+
+	seshBox.Initialize()
+	seshBox.SetOrientation(views.Vertical)
+
+	app.SetRootWidget(seshBox)
+
+	seshBox.App = app
 	if e := app.Run(); e != nil {
 		fmt.Fprintln(os.Stderr, e.Error())
 		os.Exit(1)
