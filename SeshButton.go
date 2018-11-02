@@ -7,7 +7,7 @@ import (
 	//"time"
 	//"strconv"
 	//"io/ioutil"
-	"io"
+	//"io"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
@@ -21,14 +21,15 @@ var seshColors = [8]tcell.Color{8,9,10,11,12,13,14,15}
 /* Sesh Box Stuff */
 type SeshBox struct {
 	views.BoxLayout
-	currentDir *os.File
+	currentDir string
 	App *views.Application
 
 	seshStatus *views.BoxLayout
 	seshLine *views.BoxLayout
 	seshShell *views.BoxLayout
 
-	buttons [8]*SeshButton
+	seshButtons [8]*SeshButton
+	buttonDirsRead int
 }
 
 func (b *SeshBox) HandleEvent (ev tcell.Event) bool {
@@ -41,10 +42,10 @@ func (b *SeshBox) HandleEvent (ev tcell.Event) bool {
 		case tcell.KeyRune:
 			for i, key := range seshKeys {
 				if ev.Rune() == key {
-					buttonFileInfo := b.buttons[i].GetFileInfo()
-
-					if buttonFileInfo != nil {
-						b.navigateToDirViaFileInfo(buttonFileInfo)
+					//buttonFileInfo := b.seshButtons[i].GetFileInfo()
+					dirName := b.seshButtons[i].GetFullText()
+					if dirName != "" {
+						b.navigateToRelativeDir(dirName)
 					}
 				}
 			}
@@ -53,50 +54,75 @@ func (b *SeshBox) HandleEvent (ev tcell.Event) bool {
 				return true
 			}
 			if ev.Rune() == ' ' {
-				//currentDirFileInfo, err := b.currentDir.Stat()
-				//if err != nil {
-				//	os.Exit(1)
-				//}
 				fmt.Fprintf(os.Stderr, "space was hit\n")
-				b.showMoreDirs() // show next 8 directories
+				b.ShowDirectories()
 			}
 		}
 	}
 	return b.BoxLayout.HandleEvent(ev)
 }
 
-func (b *SeshBox) Initialize() {
-	// // get current dir as os.File
-    dirname := "." + string(os.PathSeparator)
-    d, err := os.Open(dirname)
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
-	b.currentDir = d
-
-	fmt.Fprintf(os.Stderr, d.Name())
-
-    fi, err := d.Readdir(8)
-	if err == io.EOF { // no more dirs, just show first 8 again
-		fmt.Fprintf(os.Stderr, "NO more dirs!\n")
-		err = nil
-		fi, err = d.Readdir(-1)
+func exitIfError(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
+}
 
-	// // get array of dirs
-	var subDirs [8]os.FileInfo
-	dirNum := 0
-    for _, fi := range fi {
-        if dirNum < 8 && fi.Mode().IsDir() {
-			subDirs[dirNum] = fi
-            //fmt.Fprintln(os.Stderr, fi.Name(), fi.Size(), "bytes")
-        }
-    }
+func osOpenWrapper(fileName string) *os.File {
+	file, err := os.Open(fileName)
+
+	exitIfError(err)
+
+	return file
+}
+
+func osReaddirWrapper(dirFile *os.File) []os.FileInfo {
+	fileInfos, err := dirFile.Readdir(-1)
+
+	exitIfError(err)
+
+	return fileInfos
+}
+
+// populate seshButtons with next 8 directories
+func (b *SeshBox) ShowDirectories() {
+	numButtonDirs := 7 // number of buttons which get directories (7 cause ';' is gonna manually be '..')
+
+	dirFile, err := os.Open(b.currentDir)
+	defer dirFile.Close()
+	exitIfError(err)
+
+	fileInfos := osReaddirWrapper(dirFile) // os.FileInfo for each file/dir in b.Currentdir
+
+	var buttonDirs [8]string // the 8(or fewer) directory names (NOT FILES) in b.CurrentDir that will be assigned to sesh buttons
+
+	if b.buttonDirsRead >= len(fileInfos) {
+		b.buttonDirsRead = 0
+	}
+
+	curDirNum := 0 // how many directories we've found so far
+	i := b.buttonDirsRead
+	for ; i < len(fileInfos) && curDirNum < numButtonDirs; i++ { // read until we reach end of fileInfos or have found 8 dirs
+		if fileInfos[i].Mode().IsDir() {
+			buttonDirs[curDirNum] = fileInfos[i].Name()
+			curDirNum += 1
+		}
+	}
+
+	b.buttonDirsRead = i
+
+	for i := 0; i < numButtonDirs; i++ {
+		b.seshButtons[i].SetText(buttonDirs[i])
+	}
+
+	b.seshButtons[7].SetText("..")
+
+	b.Draw()
+}
+
+func (b *SeshBox) Initialize() {
+	b.currentDir = "./"
 
 	// // create sesh line
 	b.seshLine = views.NewBoxLayout(views.Horizontal)
@@ -107,12 +133,11 @@ func (b *SeshBox) Initialize() {
 
 	// // create buttons
 	for i := 0; i < 8; i++ {
-		b.buttons[i] = NewButton()
-		b.buttons[i].SetStyle(tcell.StyleDefault.Background(seshColors[i]))
-		b.buttons[i].SetAlignment(views.AlignMiddle)
-		b.buttons[i].Key = seshKeys[i]
-		b.buttons[i].SetFileInfo(subDirs[i]) // assign dir to button
-		b.seshLine.AddWidget(b.buttons[i], 0.1)
+		b.seshButtons[i] = NewButton()
+		b.seshButtons[i].SetStyle(tcell.StyleDefault.Background(seshColors[i]))
+		b.seshButtons[i].SetAlignment(views.AlignMiddle)
+		b.seshButtons[i].Key = seshKeys[i]
+		b.seshLine.AddWidget(b.seshButtons[i], 0.1)
 
 		// add spacer between buttons
 		spacer = views.NewText()
@@ -134,95 +159,19 @@ func (b *SeshBox) Initialize() {
 	b.AddWidget(b.seshLine, 0)
 	b.AddWidget(b.seshShell, 0.5)
 
-	// render ls output
+	// // populate b.SeshButtons with directory names
+	b.ShowDirectories()
 
 	// // notify watchers
 	b.PostEventWidgetContent(b)
 }
 
-func (b *SeshBox) navigateToDirViaFileInfo(newDir os.FileInfo) {
-	b.navigateToDir(newDir.Name())
-}
+func (b *SeshBox) navigateToRelativeDir(dirName string) {
+	fullNewPathName := b.currentDir + dirName + string(os.PathSeparator)
 
-func (b *SeshBox) showMoreDirs() {
-    fi, err := b.currentDir.Readdir(8)
-	if err == io.EOF { // no more dirs, just show first 8 again
-		fmt.Fprintf(os.Stderr, "NO more dirs!\n")
-		err = nil
-		fi, err = b.currentDir.Readdir(-1)
-	}
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
-
-	var subDirs [8]os.FileInfo
-	dirNum := 0
-    for _, fi := range fi {
-        if dirNum < 8 && fi.Mode().IsDir() {
-			subDirs[dirNum] = fi
-			dirNum += 1
-            //fmt.Fprintln(os.Stderr, fi.Name(), fi.Size(), "bytes")
-        }
-    }
-
-	// make ; go up one dir
-	subDirs[7], err = os.Stat("..")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	for i, subDir := range subDirs {
-		b.buttons[i].SetFileInfo(subDir)
-	}
-
-	b.Draw()
-	b.PostEventWidgetContent(b)
-}
-
-func (b *SeshBox) navigateToDir(newDirRelative string) {
-	newDirName := b.currentDir.Name() + newDirRelative + string(os.PathSeparator)
-	//newDirName := newDir.Name()
-
-    dir, err := os.Open(newDirName)
-    if err != nil {
-		fmt.Fprintf(os.Stderr, "Error in navigateToDir; oldDir: %q, newDir: %q, fullNewPath: %q", b.currentDir.Name(), newDirRelative, newDirName)
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
-
-	b.currentDir = dir
-
-    fi, err := dir.Readdir(8)
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
-    }
-
-	var subDirs [8]os.FileInfo
-	dirNum := 0
-    for _, fi := range fi {
-        if dirNum < 8 && fi.Mode().IsDir() {
-			subDirs[dirNum] = fi
-			dirNum += 1
-            //fmt.Fprintln(os.Stderr, fi.Name(), fi.Size(), "bytes")
-        }
-    }
-
-	// make ; go up one dir
-	subDirs[7], err = os.Stat("..") 
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	for i, subDir := range subDirs {
-		b.buttons[i].SetFileInfo(subDir)
-	}
-
-	b.Draw()
-	b.PostEventWidgetContent(b)
+	b.currentDir = fullNewPathName
+	b.buttonDirsRead = 0
+	b.ShowDirectories()
 }
 
 func NewSeshBox() *SeshBox {
@@ -235,7 +184,6 @@ func NewSeshBox() *SeshBox {
 type SeshButton struct {
 	views.Text
 	Key rune
-	fileInfo os.FileInfo
 	boxWidth int
 	fullText string // unclipped text
 	view views.View
@@ -243,7 +191,6 @@ type SeshButton struct {
 
 
 /// Overloaded functions
-
 func (button *SeshButton) HandleEvent(ev tcell.Event) bool {
 	switch ev := ev.(type) {
 	case *tcell.EventKey:
@@ -257,7 +204,7 @@ func (button *SeshButton) HandleEvent(ev tcell.Event) bool {
 
 func (button *SeshButton) SetText(text string) {
 	button.fullText = text
-	button.Text.SetText(text)
+	button.ReText()
 }
 
 func (b *SeshButton) SetView(view views.View) {
@@ -268,8 +215,7 @@ func (b *SeshButton) SetView(view views.View) {
 func (b *SeshButton) Resize() {
 	viewWidth, _ := b.view.Size()
 	b.boxWidth = (viewWidth - 10) / 8
-	//fmt.Fprintf(os.Stderr, "Resize(): %d %d\n", b.boxWidth, viewWidth)
-	b.boxWidth = viewWidth
+	//b.boxWidth = viewWidth
 	b.Text.Resize()
 }
 
@@ -287,32 +233,20 @@ func (b *SeshButton) Draw() {
 
 
 /// New functions
-
-func (button *SeshButton) SetFileInfo(info os.FileInfo) {
-	button.fileInfo = info
-	button.ReText()
-}
-
-func (button *SeshButton) GetFileInfo() (info os.FileInfo) {
-	return button.fileInfo
-}
-
 // Reset the text by using textWidth and fileInfo
 func (button *SeshButton) ReText() {
-	//fmt.Fprintf(os.Stderr, "TextWidth: "+strconv.Itoa(button.boxWidth)+"\n")
-	if button.fileInfo == nil {
-		button.SetText("")
-		return
-	}
-
-	filename := button.fileInfo.Name()
+	filename := button.fullText
 	button.fullText = filename
 	if len(filename) > button.boxWidth && button.boxWidth > 2 {
 		//fmt.Fprintf(os.Stderr,"Clipping %d " +filename+"\n", button.boxWidth)
 		filename = filename[0:button.boxWidth-1] + "~"
 	}
 
-	button.SetText(filename)
+	button.Text.SetText(filename)
+}
+
+func (button *SeshButton) GetFullText() string {
+	return button.fullText
 }
 
 func NewButton() *SeshButton {
