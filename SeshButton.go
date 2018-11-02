@@ -7,6 +7,7 @@ import (
 	//"time"
 	//"strconv"
 	//"io/ioutil"
+	"io"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
@@ -43,13 +44,21 @@ func (b *SeshBox) HandleEvent (ev tcell.Event) bool {
 					buttonFileInfo := b.buttons[i].GetFileInfo()
 
 					if buttonFileInfo != nil {
-						b.navigateToDir(buttonFileInfo)
+						b.navigateToDirViaFileInfo(buttonFileInfo)
 					}
 				}
 			}
 			if ev.Rune() == 'q' {
 				b.App.Quit()
 				return true
+			}
+			if ev.Rune() == ' ' {
+				//currentDirFileInfo, err := b.currentDir.Stat()
+				//if err != nil {
+				//	os.Exit(1)
+				//}
+				fmt.Fprintf(os.Stderr, "space was hit\n")
+				b.showMoreDirs() // show next 8 directories
 			}
 		}
 	}
@@ -68,7 +77,12 @@ func (b *SeshBox) Initialize() {
 
 	fmt.Fprintf(os.Stderr, d.Name())
 
-    fi, err := d.Readdir(-1)
+    fi, err := d.Readdir(8)
+	if err == io.EOF { // no more dirs, just show first 8 again
+		fmt.Fprintf(os.Stderr, "NO more dirs!\n")
+		err = nil
+		fi, err = d.Readdir(-1)
+	}
     if err != nil {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
@@ -94,7 +108,7 @@ func (b *SeshBox) Initialize() {
 	// // create buttons
 	for i := 0; i < 8; i++ {
 		b.buttons[i] = NewButton()
-		b.buttons[i].SetStyle(tcell.StyleDefault.Background(tcell.ColorGrey))
+		b.buttons[i].SetStyle(tcell.StyleDefault.Background(seshColors[i]))
 		b.buttons[i].SetAlignment(views.AlignMiddle)
 		b.buttons[i].Key = seshKeys[i]
 		b.buttons[i].SetFileInfo(subDirs[i]) // assign dir to button
@@ -126,20 +140,61 @@ func (b *SeshBox) Initialize() {
 	b.PostEventWidgetContent(b)
 }
 
-func (b *SeshBox) navigateToDir(newDir os.FileInfo) {
-	newDirName := b.currentDir.Name() + newDir.Name() + string(os.PathSeparator) 
+func (b *SeshBox) navigateToDirViaFileInfo(newDir os.FileInfo) {
+	b.navigateToDir(newDir.Name())
+}
+
+func (b *SeshBox) showMoreDirs() {
+    fi, err := b.currentDir.Readdir(8)
+	if err == io.EOF { // no more dirs, just show first 8 again
+		fmt.Fprintf(os.Stderr, "NO more dirs!\n")
+		err = nil
+		fi, err = b.currentDir.Readdir(-1)
+	}
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        os.Exit(1)
+    }
+
+	var subDirs [8]os.FileInfo
+	dirNum := 0
+    for _, fi := range fi {
+        if dirNum < 8 && fi.Mode().IsDir() {
+			subDirs[dirNum] = fi
+			dirNum += 1
+            //fmt.Fprintln(os.Stderr, fi.Name(), fi.Size(), "bytes")
+        }
+    }
+
+	// make ; go up one dir
+	subDirs[7], err = os.Stat("..")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	for i, subDir := range subDirs {
+		b.buttons[i].SetFileInfo(subDir)
+	}
+
+	b.Draw()
+	b.PostEventWidgetContent(b)
+}
+
+func (b *SeshBox) navigateToDir(newDirRelative string) {
+	newDirName := b.currentDir.Name() + newDirRelative + string(os.PathSeparator)
 	//newDirName := newDir.Name()
 
     dir, err := os.Open(newDirName)
     if err != nil {
-		fmt.Fprintf(os.Stderr, "Error in navigateToDir; oldDir: %q, newDir: %q, fullNewPath: %q", b.currentDir.Name(), newDir.Name(), newDirName)
+		fmt.Fprintf(os.Stderr, "Error in navigateToDir; oldDir: %q, newDir: %q, fullNewPath: %q", b.currentDir.Name(), newDirRelative, newDirName)
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
     }
 
 	b.currentDir = dir
 
-    fi, err := dir.Readdir(-1)
+    fi, err := dir.Readdir(8)
     if err != nil {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
