@@ -1,5 +1,7 @@
 # sesh
 
+*Note: This project is very far from useful & not yet recommended for use by anybody*
+
 Sesh (SpacE SHell) is an experimental tui file browser.
 
 It's written in Go and uses [tcell](https://github.com/gdamore/tcell).
